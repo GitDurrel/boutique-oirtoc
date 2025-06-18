@@ -602,6 +602,7 @@ if (!empty($active_categories) && !is_wp_error($active_categories)) {
 ?>
 <section class="woocommerce-products-section">
   <div class="container">
+    <ul class="products">
     <?php
     $args = array(
       'post_type' => 'product',
@@ -613,21 +614,18 @@ if (!empty($active_categories) && !is_wp_error($active_categories)) {
     $woocommerce_loop['columns'] = 4;
 
     if ($loop->have_posts()) :
-      woocommerce_product_loop_start();
-
       while ($loop->have_posts()) : $loop->the_post();
         global $product;
         $product = wc_get_product(get_the_ID());
         wc_get_template_part('content', 'product');
       endwhile;
-
-      woocommerce_product_loop_end();
     else :
       echo '<p>Aucun produit trouvé.</p>';
     endif;
 
     wp_reset_postdata();
     ?>
+    </ul>
   </div>
 </section>
 

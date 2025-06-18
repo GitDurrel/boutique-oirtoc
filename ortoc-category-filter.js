@@ -1,30 +1,51 @@
 document.addEventListener('DOMContentLoaded', function () {
+    console.log('Ortoc Category Filter: Script loaded');
+    
+    // Check if we're on the right page (optional)
+    if (!document.querySelector('.woocommerce-products-section')) {
+        console.log('Ortoc Category Filter: Not on products page, skipping');
+        return;
+    }
+    
     // Check if localization parameters are available
     if (typeof ortoc_filter_params === 'undefined') {
         console.error('Localization parameters (ortoc_filter_params) not found. AJAX filtering will not work.');
         return; // Stop execution if params are missing
     }
 
+    console.log('Ortoc Category Filter: Parameters found', ortoc_filter_params);
+
     const ajaxUrl = ortoc_filter_params.ajax_url;
     const nonce = ortoc_filter_params.nonce;
     const filterButtons = document.querySelectorAll('.filter-button');
+
+    console.log('Ortoc Category Filter: Found', filterButtons.length, 'filter buttons');
+
+    if (filterButtons.length === 0) {
+        console.error('Ortoc Category Filter: No filter buttons found');
+        return;
+    }
 
     // Attempt to find the product container
     let productsContainer = document.querySelector('.woocommerce-products-section ul.products');
     if (!productsContainer) {
         // Fallback selector if the primary one isn't found
         productsContainer = document.querySelector('section.woocommerce-products-section div.container');
+        console.log('Ortoc Category Filter: Using fallback container selector');
     }
-    // If still not found, log an error and disable filtering, as there's nowhere to put results.
+    
     if (!productsContainer) {
         console.error('Products container not found. AJAX product filtering will not be able to display results.');
-        // Optionally, disable buttons or provide user feedback here
+        console.log('Ortoc Category Filter: Available containers:', document.querySelectorAll('.woocommerce-products-section'));
         return;
     }
+
+    console.log('Ortoc Category Filter: Products container found', productsContainer);
 
     filterButtons.forEach(button => {
         button.addEventListener('click', function (event) {
             event.preventDefault();
+            console.log('Ortoc Category Filter: Button clicked', this.dataset.category);
 
             const categorySlug = this.dataset.category;
 
@@ -43,39 +64,40 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append('category_slug', categorySlug);
             formData.append('_ajax_nonce', nonce);
 
+            console.log('Ortoc Category Filter: Sending AJAX request for category:', categorySlug);
+
             // Perform AJAX request using Fetch API
             fetch(ajaxUrl, {
                 method: 'POST',
                 body: formData,
             })
             .then(response => {
+                console.log('Ortoc Category Filter: Response received', response.status);
                 if (!response.ok) {
                     throw new Error('Network response was not ok: ' + response.statusText);
                 }
                 return response.json(); // Parse JSON response from WordPress
             })
             .then(data => {
+                console.log('Ortoc Category Filter: Data received', data);
                 if (data.success && data.data && typeof data.data.html !== 'undefined') {
                     if (productsContainer) {
                         productsContainer.innerHTML = data.data.html;
+                        console.log('Ortoc Category Filter: Products updated successfully');
                     } else {
-                        // This case should ideally be prevented by the initial check,
-                        // but as a safeguard:
                         console.error('Products container not found when trying to display results.');
                     }
                 } else {
                     console.error('Error processing AJAX response or no HTML received:', data);
-                    // Optionally display a user-friendly error message in the productsContainer
                     if (productsContainer) {
-                        productsContainer.innerHTML = '<p class="woocommerce-error">Error loading products. Please try again.</p>';
+                        productsContainer.innerHTML = '<p class="woocommerce-error">Erreur lors du chargement des produits. Veuillez réessayer.</p>';
                     }
                 }
             })
             .catch(error => {
                 console.error('AJAX Request Failed:', error);
                 if (productsContainer) {
-                    // Display a user-friendly error message
-                    productsContainer.innerHTML = '<p class="woocommerce-error">Failed to load products. Please check your connection and try again.</p>';
+                    productsContainer.innerHTML = '<p class="woocommerce-error">Échec du chargement des produits. Vérifiez votre connexion et réessayez.</p>';
                 }
             })
             .finally(() => {
@@ -88,7 +110,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Optional: Add a simple CSS rule for the loading class via JavaScript
-    // This is just for demonstration; ideally, this would be in your theme's CSS file.
     const style = document.createElement('style');
     style.textContent = `
         .woocommerce-products-section ul.products.loading,
@@ -98,4 +119,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     `;
     document.head.appendChild(style);
+    
+    console.log('Ortoc Category Filter: Setup complete');
 });
