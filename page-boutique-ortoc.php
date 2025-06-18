@@ -525,33 +525,75 @@ get_header();
     justify-content: center;
     gap: 10px; /* Spacing between buttons */
     margin-bottom: 20px; /* Space below the row of buttons */
+    align-items: flex-start; /* Align groups to the top if they wrap */
 }
 
 .filter-button {
     padding: 10px 20px;
-    margin: 5px;
-    border: 1px solid var(--primary-color, #0C4178); /* Use CSS variable with fallback */
-    border-radius: 20px; /* Rounded buttons */
-    background-color: var(--white, #fff);
-    color: var(--primary-color, #0C4178);
+    margin: 5px; /* Increased margin slightly for group layout */
+    border: 1px solid #0c4178;
+    border-radius: 20px;
+    background-color: #ffffff;
+    color: #0c4178;
     cursor: pointer;
-    font-family: 'Fredoka', sans-serif; /* Consistent font */
+    font-family: 'Fredoka', sans-serif;
     font-size: 0.9rem;
     font-weight: 500;
-    transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+    transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease, border-color 0.3s ease;
+    display: inline-flex; /* To align text and toggle icon if it's inside */
+    align-items: center;
 }
 
 .filter-button:hover {
-    background-color: var(--primary-color-light, #1E78BA); /* A lighter shade of primary for hover */
-    color: var(--white, #fff);
+    background-color: #f0f8ff;
+    color: #0c4178;
+    border-color: #0c4178; /* Keep border color consistent on hover */
     transform: translateY(-2px);
 }
 
 .filter-button.active {
-    background-color: var(--primary-color, #0C4178);
-    color: var(--white, #fff);
-    border-color: var(--primary-color, #0C4178);
+    background-color: #0c4178;
+    color: #ffd700;
+    border-color: #0c4178; /* Or #ffd700 if gold border is preferred for active */
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Styles for Hierarchy */
+.category-group {
+    margin-bottom: 5px;
+    /* Can be display: flex; flex-direction: column; if needed, but default block behavior might be fine */
+}
+
+.filter-button.is-parent {
+    /* Parent specific styles if any, e.g., different font-weight if desired */
+    /* The toggle icon is part of this button's content */
+}
+
+.toggle-icon {
+    margin-left: 8px;
+    font-weight: bold;
+    display: inline-block; /* Ensures it flows with text */
+    transition: transform 0.2s ease-in-out;
+}
+
+.toggle-icon.open {
+    transform: rotate(45deg); /* Rotates '+' to 'x' or similar */
+}
+
+.subcategory-list {
+    margin-left: 25px; /* Indent subcategories */
+    padding-left: 10px;
+    border-left: 1px dashed #ccc;
+    margin-top: 5px; /* Space between parent button and child list */
+    /* display: none; is handled by JS */
+}
+
+.filter-button.is-child {
+    font-size: 0.85em; /* Slightly smaller */
+    padding: 6px 12px; /* Adjust padding */
+    margin: 3px; /* Adjust margin */
+    /* background-color: #f9f9f9; /* Optional: slightly different background for children */
+    /* border-color: #ddd; */
 }
 /* End Category Filter Styles */
 
@@ -588,16 +630,82 @@ get_header();
 </section>
 
 <?php
-$active_categories = get_terms('product_cat', array('hide_empty' => true));
-if (!empty($active_categories) && !is_wp_error($active_categories)) {
-    echo '<div class="category-filters-container">';
-    echo '<div class="category-filters">';
-    echo '<button class="filter-button active" data-category="all">All</button>';
-    foreach ($active_categories as $category) {
-        echo '<button class="filter-button" data-category="' . esc_attr($category->slug) . '">' . esc_html($category->name) . '</button>';
+$all_categories = get_terms('product_cat', array('hide_empty' => true, 'orderby' => 'name', 'order' => 'ASC'));
+$parent_categories = array();
+$child_categories_map = array(); // Store children mapped by parent_id
+
+if (!empty($all_categories) && !is_wp_error($all_categories)) {
+    // First, map all categories by their IDs for easy lookup
+    $categories_by_id = array();
+    foreach ($all_categories as $category) {
+        $categories_by_id[$category->term_id] = $category;
     }
-    echo '</div>';
-    echo '</div>';
+
+    // Separate parent and child categories
+    foreach ($all_categories as $category) {
+        if ($category->parent == 0) {
+            $parent_categories[] = $category;
+        } else {
+            // Ensure parent exists in our fetched list before adding as a child
+            // This handles potential orphans if a parent category is empty and hide_empty is true
+            if (isset($categories_by_id[$category->parent])) {
+                 $child_categories_map[$category->parent][] = $category;
+            } else {
+                // Treat as a parent if its own parent wasn't fetched (e.g. parent is empty)
+                $is_already_parent = false;
+                foreach($parent_categories as $p_cat){
+                    if($p_cat->term_id == $category->term_id){
+                        $is_already_parent = true;
+                        break;
+                    }
+                }
+                if(!$is_already_parent) { $parent_categories[] = $category; }
+            }
+        }
+    }
+
+    // Sort parent categories by name
+    usort($parent_categories, function($a, $b) {
+        return strcmp($a->name, $b->name);
+    });
+
+    echo '<div class="category-filters-container">';
+    // The main div with class "category-filters" might need adjustment or removal
+    // if category-groups are now the primary flex items.
+    // For now, keeping it as a general wrapper.
+    echo '<div class="category-filters">';
+
+    echo '<button class="filter-button active" data-category="all">All</button>';
+
+    foreach ($parent_categories as $parent_term) {
+        $current_child_terms = isset($child_categories_map[$parent_term->term_id]) ? $child_categories_map[$parent_term->term_id] : array();
+        // Sort child terms by name
+        if (!empty($current_child_terms)) {
+            usort($current_child_terms, function($a, $b) {
+                return strcmp($a->name, $b->name);
+            });
+        }
+
+        echo '<div class="category-group">';
+        echo '<button class="filter-button is-parent" data-category="' . esc_attr($parent_term->slug) . '">';
+        echo esc_html($parent_term->name);
+        if (!empty($current_child_terms)) {
+            echo ' <span class="toggle-icon">+</span>';
+        }
+        echo '</button>';
+
+        if (!empty($current_child_terms)) {
+            echo '<div class="subcategory-list" style="display: none;">';
+            foreach ($current_child_terms as $child_term) {
+                echo '<button class="filter-button is-child" data-category="' . esc_attr($child_term->slug) . '">' . esc_html($child_term->name) . '</button>';
+            }
+            echo '</div>'; // Close subcategory-list
+        }
+        echo '</div>'; // Close category-group
+    }
+
+    echo '</div>'; // Close category-filters
+    echo '</div>'; // Close category-filters-container
 }
 ?>
 <section class="woocommerce-products-section">

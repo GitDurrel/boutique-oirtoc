@@ -1,49 +1,64 @@
 document.addEventListener('DOMContentLoaded', function () {
-    // Check if localization parameters are available
     if (typeof ortoc_filter_params === 'undefined') {
         console.error('Localization parameters (ortoc_filter_params) not found. AJAX filtering will not work.');
-        return; // Stop execution if params are missing
+        return;
     }
 
     const ajaxUrl = ortoc_filter_params.ajax_url;
     const nonce = ortoc_filter_params.nonce;
-    const filterButtons = document.querySelectorAll('.filter-button');
+    // Get all filter buttons (parents and children) within the main filter container
+    const allFilterButtons = document.querySelectorAll('.category-filters-container .filter-button');
 
-    // Attempt to find the product container
     let productsContainer = document.querySelector('.woocommerce-products-section ul.products');
     if (!productsContainer) {
-        // Fallback selector if the primary one isn't found
         productsContainer = document.querySelector('section.woocommerce-products-section div.container');
     }
-    // If still not found, log an error and disable filtering, as there's nowhere to put results.
     if (!productsContainer) {
         console.error('Products container not found. AJAX product filtering will not be able to display results.');
-        // Optionally, disable buttons or provide user feedback here
         return;
     }
 
-    filterButtons.forEach(button => {
+    allFilterButtons.forEach(button => {
         button.addEventListener('click', function (event) {
             event.preventDefault();
+            const clickedButton = this;
 
-            const categorySlug = this.dataset.category;
+            // --- Toggle Functionality for Parent Buttons ---
+            if (clickedButton.classList.contains('is-parent')) {
+                const parentGroup = clickedButton.closest('.category-group');
+                if (parentGroup) {
+                    const subcategoryList = parentGroup.querySelector('.subcategory-list');
+                    const toggleIcon = clickedButton.querySelector('.toggle-icon');
 
-            // Update active button state
-            filterButtons.forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
+                    if (subcategoryList) {
+                        const isCurrentlyOpen = subcategoryList.style.display !== 'none';
+                        subcategoryList.style.display = isCurrentlyOpen ? 'none' : 'block';
+                        if (toggleIcon) {
+                            toggleIcon.classList.toggle('open', !isCurrentlyOpen);
+                            toggleIcon.textContent = isCurrentlyOpen ? '+' : '-';
+                        }
+                    }
+                }
+            }
 
-            // Add loading state
+            // --- Active State Management ---
+            // Remove 'active' from all filter buttons
+            allFilterButtons.forEach(btn => btn.classList.remove('active'));
+            // Add 'active' to the currently clicked button
+            clickedButton.classList.add('active');
+
+            // --- AJAX Call ---
+            const categorySlug = clickedButton.dataset.category;
+
             if (productsContainer) {
                 productsContainer.classList.add('loading');
             }
 
-            // Prepare data for AJAX request
             const formData = new FormData();
             formData.append('action', 'filter_products_by_category');
             formData.append('category_slug', categorySlug);
             formData.append('_ajax_nonce', nonce);
 
-            // Perform AJAX request using Fetch API
             fetch(ajaxUrl, {
                 method: 'POST',
                 body: formData,
@@ -52,20 +67,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!response.ok) {
                     throw new Error('Network response was not ok: ' + response.statusText);
                 }
-                return response.json(); // Parse JSON response from WordPress
+                return response.json();
             })
             .then(data => {
                 if (data.success && data.data && typeof data.data.html !== 'undefined') {
                     if (productsContainer) {
                         productsContainer.innerHTML = data.data.html;
-                    } else {
-                        // This case should ideally be prevented by the initial check,
-                        // but as a safeguard:
-                        console.error('Products container not found when trying to display results.');
                     }
                 } else {
                     console.error('Error processing AJAX response or no HTML received:', data);
-                    // Optionally display a user-friendly error message in the productsContainer
                     if (productsContainer) {
                         productsContainer.innerHTML = '<p class="woocommerce-error">Error loading products. Please try again.</p>';
                     }
@@ -74,12 +84,10 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(error => {
                 console.error('AJAX Request Failed:', error);
                 if (productsContainer) {
-                    // Display a user-friendly error message
                     productsContainer.innerHTML = '<p class="woocommerce-error">Failed to load products. Please check your connection and try again.</p>';
                 }
             })
             .finally(() => {
-                // Remove loading state
                 if (productsContainer) {
                     productsContainer.classList.remove('loading');
                 }
@@ -87,8 +95,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Optional: Add a simple CSS rule for the loading class via JavaScript
-    // This is just for demonstration; ideally, this would be in your theme's CSS file.
     const style = document.createElement('style');
     style.textContent = `
         .woocommerce-products-section ul.products.loading,
@@ -96,6 +102,29 @@ document.addEventListener('DOMContentLoaded', function () {
             opacity: 0.5;
             transition: opacity 0.3s ease-in-out;
         }
+        /* CSS for .toggle-icon.open is expected to be in page-boutique-ortoc.php's <style> block */
     `;
     document.head.appendChild(style);
+
+    // Initial state: If an active button (e.g. set by backend if page loaded with a filter)
+    // is a child, expand its parent group.
+    const initiallyActiveButton = document.querySelector('.category-filters-container .filter-button.active');
+    if (initiallyActiveButton && initiallyActiveButton.classList.contains('is-child')) {
+        const parentGroup = initiallyActiveButton.closest('.category-group');
+        if (parentGroup) {
+            const parentButton = parentGroup.querySelector('.is-parent'); // The actual parent button
+            const subcategoryList = parentGroup.querySelector('.subcategory-list');
+            // Ensure parentButton and its toggleIcon exist before trying to modify them
+            if (parentButton) {
+                 const toggleIcon = parentButton.querySelector('.toggle-icon');
+                 if (subcategoryList && subcategoryList.style.display === 'none') {
+                    subcategoryList.style.display = 'block';
+                    if (toggleIcon) {
+                        toggleIcon.classList.add('open');
+                        toggleIcon.textContent = '-';
+                    }
+                }
+            }
+        }
+    }
 });
