@@ -513,7 +513,47 @@ get_header();
   }
 }
 
+/* Category Filter Styles */
+.category-filters-container {
+    margin-bottom: 30px; /* Space between filters and product grid */
+    padding: 0 20px; /* Align with section padding */
+}
 
+.category-filters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px; /* Spacing between buttons */
+    margin-bottom: 20px; /* Space below the row of buttons */
+}
+
+.filter-button {
+    padding: 10px 20px;
+    margin: 5px;
+    border: 1px solid var(--primary-color, #0C4178); /* Use CSS variable with fallback */
+    border-radius: 20px; /* Rounded buttons */
+    background-color: var(--white, #fff);
+    color: var(--primary-color, #0C4178);
+    cursor: pointer;
+    font-family: 'Fredoka', sans-serif; /* Consistent font */
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+}
+
+.filter-button:hover {
+    background-color: var(--primary-color-light, #1E78BA); /* A lighter shade of primary for hover */
+    color: var(--white, #fff);
+    transform: translateY(-2px);
+}
+
+.filter-button.active {
+    background-color: var(--primary-color, #0C4178);
+    color: var(--white, #fff);
+    border-color: var(--primary-color, #0C4178);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+/* End Category Filter Styles */
 
 </style>
 
@@ -547,6 +587,19 @@ get_header();
     </div>
 </section>
 
+<?php
+$active_categories = get_terms('product_cat', array('hide_empty' => true));
+if (!empty($active_categories) && !is_wp_error($active_categories)) {
+    echo '<div class="category-filters-container">';
+    echo '<div class="category-filters">';
+    echo '<button class="filter-button active" data-category="all">All</button>';
+    foreach ($active_categories as $category) {
+        echo '<button class="filter-button" data-category="' . esc_attr($category->slug) . '">' . esc_html($category->name) . '</button>';
+    }
+    echo '</div>';
+    echo '</div>';
+}
+?>
 <section class="woocommerce-products-section">
   <div class="container">
     <?php
